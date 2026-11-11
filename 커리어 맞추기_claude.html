@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>축구선수 커리어 맞추기 퀴즈</title>
+<style>
+:root{
+  --grass:#e6eee2; --grass-2:#dce7d7; --ink:#14261b; --sub:#4b6354; --paper:#fbfcf9;
+  --line:#c3d2bf; --pass:#1d7a45; --fail:#c4372f; --card:#f3c331;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  min-height:100vh; color:var(--ink);
+  font-family:"Pretendard","Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  background:repeating-linear-gradient(90deg,var(--grass) 0 56px,var(--grass-2) 56px 112px);
+  display:flex; justify-content:center; padding:24px 16px 48px;
+}
+main{width:100%; max-width:560px}
+h1{font-size:1.5rem; font-weight:900; letter-spacing:-.02em; margin:0 0 4px}
+.lead{margin:0 0 18px; color:var(--sub); font-size:.95rem}
+.sheet{background:var(--paper); border:2px solid var(--ink); border-radius:6px; padding:20px}
+.progress{display:flex; align-items:center; gap:12px; margin-bottom:16px}
+.progress b{font-size:1.1rem; font-variant-numeric:tabular-nums}
+.bar{flex:1; height:8px; background:var(--grass-2); border:1.5px solid var(--ink); border-radius:2px; overflow:hidden}
+.bar i{display:block; height:100%; width:0; background:var(--pass); transition:width .3s}
+.prompt{margin:0 0 10px; font-weight:700}
+.career{list-style:none; margin:0 0 18px; padding:0; border:1.5px solid var(--ink); border-radius:4px}
+.career li{display:flex; gap:14px; padding:9px 12px; border-bottom:1px solid var(--line)}
+.career li:last-child{border-bottom:0}
+.career .yr{flex:0 0 7.2em; color:var(--sub); font-variant-numeric:tabular-nums}
+.career .club{font-weight:700}
+.options{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+button{font:inherit; cursor:pointer}
+.opt{padding:14px 10px; background:var(--paper); border:2px solid var(--ink); border-radius:4px; font-weight:700; color:var(--ink)}
+.opt:hover:not(:disabled){background:var(--grass)}
+.opt:disabled{cursor:default}
+.opt.right{background:var(--pass); border-color:var(--pass); color:#fff}
+.opt.wrong{background:var(--fail); border-color:var(--fail); color:#fff}
+.opt.dim{opacity:.45}
+:focus-visible{outline:3px solid var(--card); outline-offset:2px; box-shadow:0 0 0 5px var(--ink)}
+.result{margin-top:18px; display:flex; gap:16px; align-items:center; padding:14px; border:2px solid var(--ink); border-radius:4px}
+.result.pass{background:#e2f3e8; border-color:var(--pass)}
+.result.fail{background:#fbe6e4; border-color:var(--fail)}
+.result img{width:96px; height:96px; border-radius:4px; border:2px solid var(--ink); flex:none; background:#fff}
+.verdict{font-size:1.8rem; font-weight:900; margin:0}
+.pass .verdict{color:var(--pass)} .fail .verdict{color:var(--fail)}
+.answer{margin:2px 0 0; font-size:1rem}
+.next{margin-top:14px; width:100%; padding:14px; background:var(--ink); color:#fff; border:0; border-radius:4px; font-weight:800; font-size:1rem}
+.next:hover{background:#27422f}
+.score{font-size:4rem; font-weight:900; margin:4px 0; line-height:1}
+.score small{font-size:1.4rem; color:var(--sub)}
+.msg{margin:0 0 16px; color:var(--sub)}
+.review{list-style:none; margin:0 0 16px; padding:0; border:1.5px solid var(--ink); border-radius:4px}
+.review li{display:flex; justify-content:space-between; gap:10px; padding:8px 12px; border-bottom:1px solid var(--line)}
+.review li:last-child{border-bottom:0}
+.ok{color:var(--pass); font-weight:800} .no{color:var(--fail); font-weight:800}
+[hidden]{display:none!important}
+@media(max-width:420px){.options{grid-template-columns:1fr}.career .yr{flex-basis:6.6em}.result img{width:76px;height:76px}}
+</style>
+</head>
+<body>
+<main>
+  <h1>축구선수 커리어 맞추기 퀴즈</h1>
+  <p class="lead">연도별 소속팀을 보고 어떤 선수인지 맞혀 보세요.</p>
+
+  <section class="sheet" id="quiz" aria-live="polite">
+    <div class="progress">
+      <b id="num">1/10</b>
+      <div class="bar" aria-hidden="true"><i id="fill"></i></div>
+    </div>
+    <p class="prompt">이 커리어의 주인공은 누구일까요?</p>
+    <ul class="career" id="career"></ul>
+    <div class="options" id="options"></div>
+    <div id="result" hidden></div>
+    <button class="next" id="next" hidden></button>
+  </section>
+
+  <section class="sheet" id="end" hidden>
+    <p class="prompt">최종 결과</p>
+    <p class="score"><span id="score">0</span><small> / 10</small></p>
+    <p class="msg" id="msg"></p>
+    <ul class="review" id="review"></ul>
+    <button class="next" id="again">다시 도전하기</button>
+  </section>
+</main>
+
+<script>
+// ===== 퀴즈 데이터 (고정 데이터) =====
+// photo: 선수 사진을 넣으려면 이미지 주소나 data URI를 적으세요. 비워 두면 기본 이미지가 표시됩니다.
+const QUIZ = [
+  { name:"리오넬 메시", level:"유명", color:"#75aadb", photo:"",
+    career:[["2004–2021","FC 바르셀로나"],["2021–2023","파리 생제르맹"],["2023–현재","인터 마이애미"]],
+    wrong:["네이마르","카림 벤제마","루카 모드리치"] },
+  { name:"크리스티아누 호날두", level:"유명", color:"#c8102e", photo:"",
+    career:[["2002–2003","스포르팅 CP"],["2003–2009","맨체스터 유나이티드"],["2009–2018","레알 마드리드"],["2018–2021","유벤투스"],["2021–2022","맨체스터 유나이티드"],["2023–현재","알 나스르"]],
+    wrong:["가레스 베일","웨인 루니","루이스 수아레스"] },
+  { name:"손흥민", level:"유명", color:"#132257", photo:"",
+    career:[["2010–2013","함부르크 SV"],["2013–2015","바이어 레버쿠젠"],["2015–2025","토트넘 홋스퍼"],["2025–현재","LAFC"]],
+    wrong:["이강인","기성용","황희찬"] },
+  { name:"박지성", level:"유명", color:"#da291c", photo:"",
+    career:[["2000–2002","교토 퍼플상가"],["2003–2005","PSV 에인트호벤"],["2005–2012","맨체스터 유나이티드"],["2012–2013","퀸스 파크 레인저스"],["2013–2014","PSV 에인트호벤"]],
+    wrong:["이영표","안정환","설기현"] },
+  { name:"지네딘 지단", level:"유명", color:"#1f3b73", photo:"",
+    career:[["1988–1992","AS 칸"],["1992–1996","지롱댕 보르도"],["1996–2001","유벤투스"],["2001–2006","레알 마드리드"]],
+    wrong:["미셸 플라티니","파트리크 비에라","다비드 트레제게"] },
+  { name:"티에리 앙리", level:"알만한", color:"#ef0107", photo:"",
+    career:[["1994–1999","AS 모나코"],["1999","유벤투스"],["1999–2007","아스널"],["2007–2010","FC 바르셀로나"],["2010–2014","뉴욕 레드불스"]],
+    wrong:["다비드 트레제게","니콜라 아넬카","로베르 피레스"] },
+  { name:"즐라탄 이브라히모비치", level:"알만한", color:"#e32221", photo:"",
+    career:[["1999–2001","말뫼 FF"],["2001–2004","아약스"],["2004–2006","유벤투스"],["2006–2009","인터 밀란"],["2009–2010","FC 바르셀로나"],["2010–2012","AC 밀란"],["2012–2016","파리 생제르맹"],["2016–2018","맨체스터 유나이티드"],["2018–2019","LA 갤럭시"],["2019–2023","AC 밀란"]],
+    wrong:["사무엘 에토","에딘손 카바니","로베르트 레반도프스키"] },
+  { name:"카카", level:"알만한", color:"#fb090b", photo:"",
+    career:[["2001–2003","상파울루 FC"],["2003–2009","AC 밀란"],["2009–2013","레알 마드리드"],["2013–2014","AC 밀란"],["2014–2017","올랜도 시티"]],
+    wrong:["호나우지뉴","호비뉴","호나우두"] },
+  { name:"디디에 드로그바", level:"알만한", color:"#034694", photo:"",
+    career:[["1998–2002","르망"],["2002–2003","겡강"],["2003–2004","올림피크 마르세유"],["2004–2012","첼시"],["2012–2014","상하이 선화 · 갈라타사라이"],["2014–2015","첼시"],["2015–2016","몬트리올 임팩트"]],
+    wrong:["엠마뉘엘 아데바요르","야야 투레","사무엘 에토"] },
+  { name:"다비드 비야", level:"어려운", color:"#6c1d45", photo:"",
+    career:[["2001–2003","스포르팅 히혼"],["2003–2005","레알 사라고사"],["2005–2010","발렌시아 CF"],["2010–2013","FC 바르셀로나"],["2013–2014","아틀레티코 마드리드"],["2014–2018","뉴욕 시티 FC"]],
+    wrong:["페르난도 요렌테","사비 알론소","페르난도 토레스"] }
+];
+
+// ===== 보조 함수 =====
+const $ = id => document.getElementById(id);
+const shuffle = a => { a = a.slice(); for (let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+// 사진이 없을 때 쓰는 기본 이미지 (이니셜 + 팀 색상)
+function photoOf(p){
+  if (p.photo) return p.photo;
+  const ini = p.name.replace(/\s/g,"").slice(0,2);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><rect width="120" height="120" fill="${p.color}"/><circle cx="60" cy="46" r="22" fill="rgba(255,255,255,.88)"/><path d="M16 120c0-28 20-44 44-44s44 16 44 44z" fill="rgba(255,255,255,.88)"/><text x="60" y="112" text-anchor="middle" font-family="sans-serif" font-size="16" font-weight="800" fill="${p.color}">${ini}</text></svg>`;
+  return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+}
+
+// ===== 진행 상태 =====
+let idx = 0, score = 0, answered = false, log = [];
+
+function render(){
+  const p = QUIZ[idx];
+  answered = false;
+  $("num").textContent = (idx+1) + "/" + QUIZ.length;
+  $("fill").style.width = (idx / QUIZ.length * 100) + "%";
+  $("career").innerHTML = p.career.map(([y,c]) => `<li><span class="yr">${esc(y)}</span><span class="club">${esc(c)}</span></li>`).join("");
+  const opts = shuffle([p.name, ...p.wrong]);
+  $("options").innerHTML = opts.map(n => `<button class="opt" data-name="${esc(n)}">${esc(n)}</button>`).join("");
+  $("result").hidden = true; $("next").hidden = true;
+  $("options").firstElementChild.focus({preventScroll:true});
+}
+
+function choose(btn){
+  if (answered) return;
+  answered = true;
+  const p = QUIZ[idx], picked = btn.dataset.name, ok = picked === p.name;
+  if (ok) score++;
+  log.push({name:p.name, ok});
+  document.querySelectorAll(".opt").forEach(b => {
+    b.disabled = true;
+    if (b.dataset.name === p.name) b.classList.add("right");
+    else if (b === btn) b.classList.add("wrong");
+    else b.classList.add("dim");
+  });
+  const r = $("result");
+  r.className = "result " + (ok ? "pass" : "fail");
+  r.innerHTML = `<img src="${photoOf(p)}" alt="${esc(p.name)} 사진"><div><p class="verdict">${ok ? "통과!" : "땡!"}</p><p class="answer">${ok ? "정답은 " : "진짜 정답은 "}<b>${esc(p.name)}</b>${ok ? "입니다." : " 선수입니다."}</p></div>`;
+  r.hidden = false;
+  const nx = $("next");
+  nx.textContent = idx === QUIZ.length - 1 ? "결과 보기" : "다음 문제";
+  nx.hidden = false; nx.focus({preventScroll:true});
+}
+
+function finish(){
+  $("quiz").hidden = true; $("end").hidden = false;
+  $("score").textContent = score;
+  $("msg").textContent = score === 10 ? "만점입니다! 진정한 축구 박사시네요."
+    : score >= 7 ? "훌륭해요! 축구 팬이 분명하네요."
+    : score >= 4 ? "나쁘지 않아요. 한 번 더 도전해 보세요."
+    : "아직은 낯선 선수가 많았네요. 다시 도전해 보세요.";
+  $("review").innerHTML = log.map((l,i) => `<li><span>${i+1}. ${esc(l.name)}</span><span class="${l.ok?'ok':'no'}">${l.ok?'정답':'오답'}</span></li>`).join("");
+  window.scrollTo(0,0);
+}
+
+$("options").addEventListener("click", e => { const b = e.target.closest(".opt"); if (b) choose(b); });
+$("next").addEventListener("click", () => { if (idx < QUIZ.length-1){ idx++; render(); } else finish(); });
+$("again").addEventListener("click", () => { idx = 0; score = 0; log = []; $("end").hidden = true; $("quiz").hidden = false; render(); });
+
+render();
+</script>
+</body>
+</html>
